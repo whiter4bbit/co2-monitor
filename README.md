@@ -1,6 +1,6 @@
 # co2-monitor
 
-Monitor that can be started on RPI. It periodically reads measurements from the [device](http://www.wetterladen.de/aircontrol-co2-monitor-mini-tfa-31.5006) and sends results to the provided URL in [csv format](src/measurements.rs).
+Monitor that can be started on RPI. It periodically reads measurements from the [device](http://www.wetterladen.de/aircontrol-co2-monitor-mini-tfa-31.5006) and sends results to the provided URL in [csv format](src/measurement.rs).
 
 The project was inspired by the [Reverse-Engineering a low-cost USB CO₂ monitor](https://hackaday.io/project/5301-reverse-engineering-a-low-cost-usb-co-monitor) project.
 
