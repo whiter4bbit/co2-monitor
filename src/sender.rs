@@ -1,46 +1,29 @@
-use std::time::{Duration, SystemTime};
+use super::entry;
+use reqwest::{Client, Error as HTTPError, Response, Result as HTTPResult};
+use std::io;
 use std::thread::sleep;
-use std::fmt::{Display, Formatter, Result as FmtResult};
-use std::error::{Error as StdError};
-use std::result::{Result as StdResult};
-use measurement::{Measurement, CSV};
-use reqwest::{Client, Result as HTTPResult, Error as HTTPError, Response};
+use std::time::Duration;
 
 pub struct Sender {
     client: Client,
-    url: String,    
+    url: String,
+    token: String,
 }
-
-#[derive(Debug)]
-pub struct Error {
-    cause: HTTPError,
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
-        write!(f, "Can not send measurements.")
-    }
-}
-
-impl StdError for Error {
-    fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        Some(&self.cause)
-    }
-}
-
-pub type Result = StdResult<(), Error>;
 
 impl Sender {
-    pub fn new(url: &str) -> Sender {
+    pub fn new(url: String, token: String) -> Sender {
         Sender {
             client: Client::new(),
-            url: url.to_string(),
+            url: url,
+            token: token,
         }
     }
 
-    fn send(&self, measurements: &Vec<Measurement>) -> HTTPResult<Response> {
-        self.client.post(&self.url)
-            .body(measurements.as_csv())
+    fn send(&self, series: &str, body: &str) -> HTTPResult<Response> {
+        self.client
+            .post(&format!("{}/{}", self.url, series))
+            .body(serde_json::to_string(&body).unwrap())
+            .bearer_auth(&self.token)
             .send()
     }
 
@@ -48,40 +31,33 @@ impl Sender {
         !error.is_http() || !error.is_server_error()
     }
 
-    pub fn send_with_retry_forever(&self, measurements: &Vec<Measurement>) -> Result {
+    pub fn send_with_retry_forever(&self, batch: &entry::Batch) -> io::Result<()> {
         for attempt in 0.. {
             if attempt > 0 {
                 println!("[sender] Retry attempt {}", attempt);
             }
 
-            let result = self.send(measurements).and_then(|response|
-                response.error_for_status()
-            );
+            let body = serde_json::to_string(&batch.entries)
+                .map_err(|_| io::Error::new(io::ErrorKind::Other, "can not serialize batch"))?;
+
+            let result = self
+                .send(&batch.series, &body)
+                .and_then(|response| response.error_for_status());
 
             match result {
                 Ok(_) => return Ok(()),
-                Err(cause) => if Sender::is_not_retryable(&cause) {
-                    return Err(Error{
-                        cause: cause,
-                    })
+                Err(cause) => {
+                    if Sender::is_not_retryable(&cause) {
+                        return Err(io::Error::new(
+                            io::ErrorKind::Other,
+                            format!("can not send a batch {:?}", cause),
+                        ));
+                    }
                 }
             }
 
             sleep(Duration::from_secs(2));
         }
-        return Ok(())
+        return Ok(());
     }
 }
-
-//
-// python mock-server.py
-//
-// #[test]
-// fn test_send() {
-//     let data = vec![
-//         Measurement(SystemTime::now(), "t".to_string(), 12.12),
-//         Measurement(SystemTime::now(), "co2".to_string(), 12.12),
-//     ];
-//     let sender = Sender::new("http://localhost:8000/measurements");
-//     println!("{:?}", sender.send_with_retry_forever(&data));
-// }

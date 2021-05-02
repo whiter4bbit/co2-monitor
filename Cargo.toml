@@ -1,8 +1,11 @@
 [package]
 name = "co2-monitor"
 version = "0.1.0"
-authors = ["Pavel Zalunin <wr4bbit@gmail.com>"]
+authors = ["whiter4bbit <wr4bbit@gmail.com>"]
+edition = "2018"
 
 [dependencies]
 hidapi = "0.5.0"
 reqwest = "0.9.9"
+serde_json = "1.0.59"
+serde = { version = "1.0.117", features = ["derive"] }
