@@ -19,10 +19,10 @@ impl Sender {
         }
     }
 
-    fn send(&self, series: &str, body: &str) -> HTTPResult<Response> {
+    fn send(&self, series: &str, body: String) -> HTTPResult<Response> {
         self.client
             .post(&format!("{}/{}", self.url, series))
-            .body(serde_json::to_string(&body).unwrap())
+            .body(body)
             .bearer_auth(&self.token)
             .send()
     }
@@ -41,7 +41,7 @@ impl Sender {
                 .map_err(|_| io::Error::new(io::ErrorKind::Other, "can not serialize batch"))?;
 
             let result = self
-                .send(&batch.series, &body)
+                .send(&batch.series, body)
                 .and_then(|response| response.error_for_status());
 
             match result {
